@@ -4,6 +4,7 @@
 import os
 from logging import getLogger
 from typing import List
+from .utils import default_device
 
 from sentencepiece import SentencePieceProcessor
 

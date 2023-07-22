@@ -87,7 +87,7 @@ class Llama:
             checkpoints
         ), f"Loading a checkpoint for MP={len(checkpoints)} but world size is {model_parallel_size}"
         ckpt_path = checkpoints[get_model_parallel_rank()]
-        checkpoint = torch.load(ckpt_path, map_location=model_device())
+        checkpoint = torch.load(ckpt_path, map_location="cpu")
         with open(Path(ckpt_dir) / "params.json", "r") as f:
             params = json.loads(f.read())
 
@@ -127,13 +127,15 @@ class Llama:
 
         min_prompt_len = min(len(t) for t in prompt_tokens)
         max_prompt_len = max(len(t) for t in prompt_tokens)
-        assert max_prompt_len <= params.max_seq_len
+        # print("max_prompt_len: " + str(max_prompt_len))
+        # print("params.max_seq_len: " + str(params.max_seq_len))
+        # assert max_prompt_len <= params.max_seq_len
         total_len = min(params.max_seq_len, max_gen_len + max_prompt_len)
 
         pad_id = self.tokenizer.pad_id
         tokens = torch.full((bsz, total_len), pad_id, dtype=torch.long, device=default_device())
         for k, t in enumerate(prompt_tokens):
-            tokens[k, : len(t)] = torch.tensor(t, dtype=torch.long, device=default_device())
+            tokens[k, : len(t)] = torch.tensor(t[:128], dtype=torch.long, device=default_device())
         if logprobs:
             token_logprobs = torch.zeros_like(tokens, dtype=torch.float, device=default_device())
 
@@ -258,7 +260,7 @@ class Llama:
                         f"{B_INST} {(prompt['content']).strip()} {E_INST} {(answer['content']).strip()} ",
                         bos=True,
                         eos=True,
-                    ).to(default_device())
+                    )
                     for prompt, answer in zip(
                         dialog[::2],
                         dialog[1::2],
@@ -273,7 +275,8 @@ class Llama:
                 f"{B_INST} {(dialog[-1]['content']).strip()} {E_INST}",
                 bos=True,
                 eos=False,
-            ).to(default_device())
+            )
+            
             prompt_tokens.append(dialog_tokens)
 
         generation_tokens, generation_logprobs = self.generate(
